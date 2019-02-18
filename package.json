@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "express": "^4.16.4",
+    "express-graphql": "^0.7.1",
+    "graphql": "^14.1.1",
+    "node-fetch": "^2.3.0",
+    "util": "^0.11.1",
+    "xml2js": "^0.4.19"
+  }
+}
