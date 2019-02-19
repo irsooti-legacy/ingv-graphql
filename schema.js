@@ -95,12 +95,16 @@ const QuakesType = new GraphQLObjectType({
               time: event.origin[0].time[0].value[0],
               uncertainty: event.origin[0].time[0].uncertainty[0],
               depth: {
-                value: !isNaN(event.origin[0].depth[0].value)
-                  ? parseFloat(event.origin[0].depth[0].value)
-                  : -1,
-                uncertainty: !isNaN(event.origin[0].depth[0].uncertainty)
-                  ? parseFloat(event.origin[0].depth[0].uncertainty)
-                  : -1
+                value:
+                  event.origin[0].depth &&
+                  !isNaN(event.origin[0].depth[0].value)
+                    ? parseFloat(event.origin[0].depth[0].value)
+                    : -1,
+                uncertainty:
+                  event.origin[0].depth &&
+                  !isNaN(event.origin[0].depth[0].uncertainty)
+                    ? parseFloat(event.origin[0].depth[0].uncertainty)
+                    : -1
               }
             },
             creationInfo: {
@@ -146,7 +150,7 @@ module.exports = new GraphQLSchema({
             maxlon: { type: GraphQLFloat },
             minversion: { type: GraphQLFloat },
             format: { type: GraphQLString },
-            limit: { type: GraphQLInt }
+            limit: { type: GraphQLInt, defaultValue: 50 }
           },
           resolve: (root, args) => {
             const endpoint = `http://webservices.ingv.it/fdsnws/event/1/query`;
