@@ -1,5 +1,10 @@
 {
+  "name": "ingv-graphql",
+  "scripts": {
+    "serve": "node serve"
+  },
   "dependencies": {
+    "date-fns": "^1.30.1",
     "express": "^4.16.4",
     "express-graphql": "^0.7.1",
     "graphql": "^14.1.1",
