@@ -12,6 +12,16 @@ const {
   GraphQLFloat
 } = require('graphql');
 
+const MagType = new GraphQLObjectType({
+  name: 'Magnitude',
+  description: 'Magnitudo',
+
+  fields: () => ({
+    value: { type: GraphQLFloat },
+    uncertainty: { type: GraphQLFloat }
+  })
+});
+
 const QuakeType = new GraphQLObjectType({
   name: 'Quake',
   description: 'Evento sismico',
@@ -25,6 +35,9 @@ const QuakeType = new GraphQLObjectType({
     },
     creationInfo: {
       type: CreationInfo
+    },
+    magnitude: {
+      type: MagType
     }
   })
 });
@@ -88,7 +101,10 @@ const QuakesType = new GraphQLObjectType({
         return xml['q:quakeml']['eventParameters'][0].event.map(event => {
           return {
             description: event.description[0].text[0],
-
+            magnitude: {
+              value: event.magnitude[0].mag[0].value[0],
+              uncertainty: event.magnitude[0].mag[0].uncertainty[0],
+            },
             origin: {
               latitude: event.origin[0].latitude[0].value[0],
               longitude: event.origin[0].longitude[0].value[0],
