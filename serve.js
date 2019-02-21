@@ -2,7 +2,11 @@ const express = require('express');
 const graphqlHTTP = require('express-graphql');
 const app = express();
 
-const schema = require('./schema')
+const redis = require('redis');
+
+const redisClient = require('./redisClient');
+
+const schema = require('./schema');
 
 app.use(
   '/graphql',

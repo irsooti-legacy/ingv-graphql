@@ -12,6 +12,11 @@ const {
   GraphQLFloat
 } = require('graphql');
 
+const { useRedis, redisSetKey } = require('./redisClient');
+
+const Stopwatch = require('statman-stopwatch');
+const sw = new Stopwatch();
+
 const MagType = new GraphQLObjectType({
   name: 'Magnitude',
   description: 'Magnitudo',
@@ -90,6 +95,14 @@ const CreationInfo = new GraphQLObjectType({
   })
 });
 
+function getSafe(fn, defaultVal) {
+  try {
+    return fn();
+  } catch (e) {
+    return defaultVal;
+  }
+}
+
 const QuakesType = new GraphQLObjectType({
   name: 'Quakes',
   description: 'Una lista di eventi sismici',
@@ -98,35 +111,33 @@ const QuakesType = new GraphQLObjectType({
     quakes: {
       type: new GraphQLList(QuakeType),
       resolve: xml => {
+        sw.stop();
+        console.log('Time elapsed: ', sw.read() + 'ms');
         return xml['q:quakeml']['eventParameters'][0].event.map(event => {
           return {
             description: event.description[0].text[0],
             magnitude: {
-              value: event.magnitude[0].mag[0].value[0],
-              uncertainty: event.magnitude[0].mag[0].uncertainty[0],
+              value: getSafe(() => event.magnitude[0].mag[0].value[0]),
+              uncertainty: getSafe(
+                () => event.magnitude[0].mag[0].uncertainty[0]
+              )
             },
             origin: {
-              latitude: event.origin[0].latitude[0].value[0],
-              longitude: event.origin[0].longitude[0].value[0],
-              time: event.origin[0].time[0].value[0],
-              uncertainty: event.origin[0].time[0].uncertainty[0],
+              latitude: getSafe(() => event.origin[0].latitude[0].value[0]),
+              longitude: getSafe(() => event.origin[0].longitude[0].value[0]),
+              time: getSafe(() => event.origin[0].time[0].value[0]),
+              uncertainty: getSafe(
+                () => event.origin[0].time[0].uncertainty[0]
+              ),
               depth: {
-                value:
-                  event.origin[0].depth &&
-                  !isNaN(event.origin[0].depth[0].value)
-                    ? parseFloat(event.origin[0].depth[0].value)
-                    : -1,
-                uncertainty:
-                  event.origin[0].depth &&
-                  !isNaN(event.origin[0].depth[0].uncertainty)
-                    ? parseFloat(event.origin[0].depth[0].uncertainty)
-                    : -1
+                value: getSafe(() => event.origin[0].depth[0].value),
+                uncertainty: getSafe(() => event.origin[0].depth[0].uncertainty)
               }
             },
             creationInfo: {
-              agencyID: event.creationInfo[0].agencyID[0],
-              author: event.creationInfo[0].author[0],
-              creationTime: event.creationInfo[0].creationTime[0]
+              agencyID: getSafe(() => event.creationInfo[0].agencyID[0]),
+              author: getSafe(() => event.creationInfo[0].author[0]),
+              creationTime: getSafe(() => event.creationInfo[0].creationTime[0])
             }
           };
         });
@@ -134,6 +145,17 @@ const QuakesType = new GraphQLObjectType({
     }
   })
 });
+
+const ingvWebService = (() => {
+  const endpoint = `http://webservices.ingv.it/fdsnws/event/1/query`;
+  return {
+    getEvents: params => {
+      return fetch(endpoint + '?' + params.toString())
+        .then(response => response.text())
+        .then(parseXML);
+    }
+  };
+})();
 
 module.exports = new GraphQLSchema({
   query: new GraphQLObjectType({
@@ -169,14 +191,21 @@ module.exports = new GraphQLSchema({
             limit: { type: GraphQLInt, defaultValue: 50 }
           },
           resolve: (root, args) => {
-            const endpoint = `http://webservices.ingv.it/fdsnws/event/1/query`;
+            sw.start(); // Resolve is started!
             const params = new URLSearchParams();
             Object.keys(args).map(arg =>
               args[arg] ? params.append(arg, args[arg]) : null
             );
-            return fetch(endpoint + '?' + params.toString())
-              .then(response => response.text())
-              .then(parseXML);
+
+            if (args.starttime && args.endtime) {
+              const key = args.starttime + '' + args.endtime;
+              return useRedis(key, () =>
+                ingvWebService
+                  .getEvents(params.toString())
+                  .then(redisSetKey(key))
+              );
+            }
+            return ingvWebService.getEvents(params.toString(), false);
           }
         }
       };
